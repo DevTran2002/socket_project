@@ -5,6 +5,17 @@ import sys
 import heapq
 from collections import defaultdict
 
+
+quantization_matrix = np.array([[16, 11, 10, 16, 24, 40, 51, 61],
+                                [12, 12, 14, 19, 26, 58, 60, 55],
+                                [14, 13, 16, 24, 40, 57, 69, 56],
+                                [14, 17, 22, 29, 51, 87, 80, 62],
+                                [18, 22, 37, 56, 68, 109, 103, 77],
+                                [24, 35, 55, 64, 81, 104, 113, 92],
+                                [49, 64, 78, 87, 103, 121, 120, 101],
+                                [72, 92, 95, 98, 112, 100, 103, 99]])
+
+
 def rgb_to_ycbcr(img):
     r = img[:, :, 0]
     g = img[:, :, 1]
@@ -22,6 +33,13 @@ def dct_2d(block):
 def idct_2d(block):
     return idct(idct(block, axis=0, norm='ortho'), axis=1, norm='ortho')
 
+def quantize_macroblocks(macroblocks, quantization_factor):
+    return (macroblocks // quantization_factor).astype(np.uint8)
+
+# Hàm để giải lượng tử hóa các macroblocks
+def dequantize_macroblocks(quantized_macroblocks, quantization_factor):
+    return quantized_macroblocks * quantization_factor
+#
 # def dct_2d(block):
 #     result = np.zeros_like(block, dtype=float)
 #
@@ -85,15 +103,21 @@ def apply_dct(img):
             cb_dct = dct_2d(cb)
             cr_dct = dct_2d(cr)
 
+            print(y_dct.shape)
+            # **Hàm lượng tử hóa**
+            y_dct_quantized = quantize_macroblocks(y_dct, quantization_matrix)
+            cb_dct_quantized = quantize_macroblocks(cb_dct, quantization_matrix)
+            cr_dct_quantized = quantize_macroblocks(cr_dct, quantization_matrix)
+
             # # Perform quantization here (not shown in this example)
             # y_idct = idct_2d(y_dct)
             # cb_idct = idct_2d(cb_dct)
             # cr_idct = idct_2d(cr_dct)
             #
             # Update the original block with the inverse DCT results
-            img[i:i+block_size, j:j+block_size, 0] = y_dct
-            img[i:i+block_size, j:j+block_size, 1] = cb_dct
-            img[i:i+block_size, j:j+block_size, 2] = cr_dct
+            img[i:i + block_size, j:j + block_size, 0] = y_dct_quantized
+            img[i:i + block_size, j:j + block_size, 1] = cb_dct_quantized
+            img[i:i + block_size, j:j + block_size, 2] = cr_dct_quantized
 
     return img
 
@@ -209,7 +233,6 @@ def loadImg(img):
     # _image = cv2.imread(image_path)
     _image =img
     original_image = resize_with_padding(_image, block_size)
-    print(original_image.shape)
 
     # Apply DCT to the image
     compressed_image = apply_dct(original_image)
@@ -219,7 +242,6 @@ def loadImg(img):
     # Hiển thị thông tin về dữ liệu đã mã hóa RLE
     # for i, rle_data in enumerate(rle_encoded_macroblocks):
     #     print(f"RLE Encoded Data for Macroblock {i + 1}:", rle_data)
-
 
     # Tính toán tần số xuất hiện từ dữ liệu RLE
     frequencies = defaultdict(int)
@@ -234,7 +256,7 @@ def loadImg(img):
     huffman_mapping = build_huffman_codes(huffman_tree)
 
     # Hiển thị bảng mã hóa
-    # print("Huffman Mapping:", huffman_mapping)
+    print("Huffman Mapping:", huffman_mapping)
 
     # Áp dụng bảng mã hóa cho tất cả các macroblocks
     huffman_encoded_macroblocks = [
@@ -242,11 +264,13 @@ def loadImg(img):
         for rle_data in rle_encoded_macroblocks
     ]
 
-    exit()
+    sizeof = sys.getsizeof(huffman_encoded_macroblocks)
 
-    # cv2.imshow('Compressed Image', compressed_image)
+    print("huffman encode", sizeof)
+    cv2.imshow('Compressed Image', compressed_image)
+
     cv2.waitKey(0)
     cv2.destroyAllWindows()
-
+    exit()
 
 loadVideo()
